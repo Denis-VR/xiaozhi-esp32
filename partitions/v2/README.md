@@ -1,107 +1,106 @@
-# Version 2 Partition Table
+# Таблица разделов версии 2
 
-This version introduces significant improvements over v1 by adding an `assets` partition to support network-loadable content and optimizing partition layouts for different flash sizes.
+Во второй версии схема разделов переработана: добавлен раздел `assets` для загружаемых из сети материалов и оптимизированы размеры разделов под разные объёмы флеша.
 
-## Key Changes from v1
+## Основные изменения относительно v1
 
-### Major Improvements
-1. **Added Assets Partition**: New `assets` partition for network-loadable content
-2. **Replaced Model Partition**: The old `model` partition (960KB) is replaced with a larger `assets` partition
-3. **Optimized App Partitions**: Reduced application partition sizes to accommodate assets
-4. **Enhanced Flexibility**: Support for dynamic content updates without reflashing
+### Ключевые улучшения
+1. **Новый раздел Assets**: выделен раздел `assets` под ресурсы, которые можно загрузить из сети.
+2. **Замена раздела Model**: прежний `model` (960 КБ) заменён более вместительным `assets`.
+3. **Оптимизация приложений**: размеры OTA‑разделов уменьшены, чтобы освободить место под ресурсы.
+4. **Гибкость**: контент можно обновлять динамически без перепрошивки прошивки.
 
-### Assets Partition Features
-The `assets` partition stores:
-- **Wake word models**: Customizable wake word models that can be loaded from the network
-- **Theme files**: Complete theming system including:
-  - Fonts (text and icon fonts)
-  - Audio effects and sound files
-  - Background images and UI elements
-  - Custom emoji packs
-  - Language configuration files
-- **Dynamic Content**: All content can be updated over-the-air via HTTP downloads
+### Что хранится в разделе Assets
+`assets` включает:
+- **Модели активационных слов**: кастомные wake word модели, загружаемые по сети.
+- **Темы и оформление**:
+  - Шрифты (текстовые и иконковые)
+  - Аудиоэффекты и звуки
+  - Фоновые изображения и элементы UI
+  - Наборы эмодзи
+  - Языковые конфигурации
+- **Динамический контент**: все ресурсы можно обновлять OTA через HTTP.
 
-## Partition Layout Comparison
+## Сравнение раскладок
 
-### v1 Layout (16MB)
-- `nvs`: 16KB (non-volatile storage)
-- `otadata`: 8KB (OTA data)
-- `phy_init`: 4KB (PHY initialization data)
-- `model`: 960KB (model storage - fixed content)
-- `ota_0`: 6MB (application partition 0)
-- `ota_1`: 6MB (application partition 1)
+### Схема v1 (16 МБ)
+- `nvs`: 16 КБ
+- `otadata`: 8 КБ
+- `phy_init`: 4 КБ
+- `model`: 960 КБ
+- `ota_0`: 6 МБ
+- `ota_1`: 6 МБ
 
-### v2 Layout (16MB)
-- `nvs`: 16KB (non-volatile storage)
-- `otadata`: 8KB (OTA data)
-- `phy_init`: 4KB (PHY initialization data)
-- `ota_0`: 4MB (application partition 0)
-- `ota_1`: 4MB (application partition 1)
-- `assets`: 8MB (network-loadable assets)
+### Схема v2 (16 МБ)
+- `nvs`: 16 КБ
+- `otadata`: 8 КБ
+- `phy_init`: 4 КБ
+- `ota_0`: 4 МБ
+- `ota_1`: 4 МБ
+- `assets`: 8 МБ
 
-## Available Configurations
+## Доступные конфигурации
 
-### 8MB Flash Devices (`8m.csv`)
-- `nvs`: 16KB
-- `otadata`: 8KB
-- `phy_init`: 4KB
-- `ota_0`: 3MB
-- `ota_1`: 3MB
-- `assets`: 2MB
+### Устройства с 8 МБ флеша (`8m.csv`)
+- `nvs`: 16 КБ
+- `otadata`: 8 КБ
+- `phy_init`: 4 КБ
+- `ota_0`: 3 МБ
+- `ota_1`: 3 МБ
+- `assets`: 2 МБ
 
-### 16MB Flash Devices (`16m.csv`) - Standard
-- `nvs`: 16KB
-- `otadata`: 8KB
-- `phy_init`: 4KB
-- `ota_0`: 4MB
-- `ota_1`: 4MB
-- `assets`: 8MB
+### Устройства с 16 МБ (`16m.csv`) — стандарт
+- `nvs`: 16 КБ
+- `otadata`: 8 КБ
+- `phy_init`: 4 КБ
+- `ota_0`: 4 МБ
+- `ota_1`: 4 МБ
+- `assets`: 8 МБ
 
-### 16MB Flash Devices (`16m_c3.csv`) - ESP32-C3 Optimized
-- `nvs`: 16KB
-- `otadata`: 8KB
-- `phy_init`: 4KB
-- `ota_0`: 4MB
-- `ota_1`: 4MB
-- `assets`: 4MB (4000K - limited by available mmap pages)
+### Устройства с 16 МБ (`16m_c3.csv`) — оптимизация для ESP32-C3
+- `nvs`: 16 КБ
+- `otadata`: 8 КБ
+- `phy_init`: 4 КБ
+- `ota_0`: 4 МБ
+- `ota_1`: 4 МБ
+- `assets`: 4 МБ (≈4000 КБ, ограничение по количеству mmap‑страниц)
 
-### 32MB Flash Devices (`32m.csv`)
-- `nvsfactory`: 200KB
-- `nvs`: 840KB
-- `otadata`: 8KB
-- `phy_init`: 4KB
-- `ota_0`: 4MB
-- `ota_1`: 4MB
-- `assets`: 16MB
+### Устройства с 32 МБ (`32m.csv`)
+- `nvsfactory`: 200 КБ
+- `nvs`: 840 КБ
+- `otadata`: 8 КБ
+- `phy_init`: 4 КБ
+- `ota_0`: 4 МБ
+- `ota_1`: 4 МБ
+- `assets`: 16 МБ
 
-## Benefits
+## Преимущества
 
-1. **Dynamic Content Management**: Users can download and update wake word models, themes, and other assets without reflashing the device
-2. **Reduced App Size**: Application partitions are optimized, allowing more space for dynamic content
-3. **Enhanced Customization**: Support for custom themes, wake words, and language packs enhances user experience
-4. **Network Flexibility**: Assets can be updated independently of the main application firmware
-5. **Better Resource Utilization**: Efficient use of flash memory with configurable asset storage
-6. **OTA Asset Updates**: Assets can be updated over-the-air via HTTP downloads
+1. **Динамическое управление контентом**: обновление моделей, тем и прочих ресурсов без перепрошивки.
+2. **Сокращённый размер приложений**: оптимизированные OTA‑разделы освобождают место под данные.
+3. **Гибкая кастомизация**: поддержка пользовательских тем, wake word и языковых паков.
+4. **Независимые обновления**: ресурсы можно менять отдельно от основной прошивки.
+5. **Эффективное использование флеша**: конфигурируемый объём `assets` под разные устройства.
+6. **OTA‑обновления ресурсов**: загрузка через HTTP с устройства.
 
-## Technical Details
+## Технические детали
 
-- **Partition Type**: Assets partition uses `spiffs` subtype for SPIFFS filesystem compatibility
-- **Memory Mapping**: Assets are memory-mapped for efficient access during runtime
-- **Checksum Validation**: Built-in integrity checking ensures asset data validity
-- **Progressive Download**: Assets can be downloaded progressively with progress tracking
-- **Fallback Support**: Graceful fallback to default assets if network updates fail
+- **Тип раздела**: `assets` использует подтип `spiffs`, совместимый с файловой системой SPIFFS.
+- **Память**: ресурсы memory-mapped для быстрого доступа во время работы.
+- **Контроль целостности**: встроенная проверка чексумм.
+- **Постепенная загрузка**: поддержка прогрессивного скачивания с индикацией прогресса.
+- **Fallback**: возврат к дефолтным ресурсам при сбое обновления.
 
-## Migration from v1
+## Переход с v1
 
-When upgrading from v1 to v2:
-1. **Backup Important Data**: Ensure any important data in the old `model` partition is backed up
-2. **Flash New Partition Table**: Use the appropriate v2 partition table for your flash size
-3. **Download Assets**: The device will automatically download required assets on first boot
-4. **Verify Functionality**: Ensure all features work correctly with the new partition layout
+1. **Сделайте резервную копию** данных из старого раздела `model`.
+2. **Залейте новую таблицу разделов** с подходящей v2‑конфигурацией.
+3. **Загрузите ресурсы** — при первом запуске устройство скачает их автоматически.
+4. **Проверьте функциональность** после миграции.
 
-## Usage Notes
+## Дополнительные замечания
 
-- The `assets` partition size varies by configuration to optimize for different flash sizes
-- ESP32-C3 devices use a smaller assets partition (4MB) due to limited available mmap pages in the system
-- 32MB devices get the largest assets partition (16MB) for maximum content storage
-- All partition tables maintain proper alignment for optimal flash performance 
+- Размер `assets` зависит от выбранной таблицы, чтобы лучше вписаться в доступный флеш.
+- На ESP32-C3 раздел ресурсов ограничен 4 МБ из-за числа mmap‑страниц.
+- На 32‑мегабайтных платах доступно до 16 МБ под контент.
+- Все таблицы соблюдают выравнивание для оптимальной работы флеша.

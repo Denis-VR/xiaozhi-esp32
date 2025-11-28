@@ -1,81 +1,77 @@
 # EchoEar 喵伴
 
-## 简介
+## Введение
 
 <div align="center">
-    <a href="https://oshwhub.com/esp-college/echoear"><b> 立创开源平台 </b></a>
+    <a href="https://oshwhub.com/esp-college/echoear"><b> Платформа LCSC Open Source </b></a>
 </div>
 
-EchoEar 喵伴是一款智能 AI 开发套件，搭载 ESP32-S3-WROOM-1 模组，1.85 寸 QSPI 圆形触摸屏，双麦阵列，支持离线语音唤醒与声源定位算法。硬件详情等可查看[立创开源项目](https://oshwhub.com/esp-college/echoear)。
+EchoEar 喵伴 — интеллектуальный AI‑набор на базе модуля ESP32-S3-WROOM-1. Плата оснащена круговым QSPI‑тачскрином 1,85", массивом из двух микрофонов, поддерживает офлайн‑пробуждение по голосу и алгоритмы определения направления звука. Подробнее о железе можно узнать на [странице проекта LCSC](https://oshwhub.com/esp-college/echoear).
 
-## 配置、编译命令
+## Настройка и сборка
 
-**配置编译目标为 ESP32S3**
+**Выбор целевого чипа ESP32-S3**
 
 ```bash
 idf.py set-target esp32s3
 ```
 
-**打开 menuconfig 并配置**
+**Открытие menuconfig**
 
 ```bash
 idf.py menuconfig
 ```
 
-分别配置如下选项：
+Далее последовательно настройте параметры.
 
-### 基本配置
-- `Xiaozhi Assistant` → `Board Type` → 选择 `EchoEar`
+### Базовые настройки
+- `Xiaozhi Assistant` → `Board Type` → выбрать `EchoEar`
 
-### UI风格选择
+### Выбор стиля UI
 
-EchoEar 支持多种不同的 UI 显示风格，通过 menuconfig 配置选择：
+EchoEar поддерживает несколько вариантов отображения интерфейса, переключаемых через menuconfig:
+- `Xiaozhi Assistant` → `Select display style` → выбрать нужный стиль
 
-- `Xiaozhi Assistant` → `Select display style` → 选择显示风格
+#### Доступные стили
 
-#### 可选风格
+##### Эмоциональные анимации (Emote animation style) — рекомендовано
+- **Опция**: `USE_EMOTE_MESSAGE_STYLE`
+- **Описание**: применяет систему `EmoteDisplay`
+- **Возможности**: богатые анимации эмоций, движение глаз, иконки состояния
+- **Сценарий**: голосовой ассистент с выразительным UI
+- **Класс**: `emote::EmoteDisplay`
 
-##### 表情动画风格 (Emote animation style) - 推荐
-- **配置选项**: `USE_EMOTE_MESSAGE_STYLE`
-- **特点**: 使用自定义的 `EmoteDisplay` 表情显示系统
-- **功能**: 支持丰富的表情动画、眼睛动画、状态图标显示
-- **适用**: 智能助手场景，提供更生动的人机交互体验
-- **类**: `emote::EmoteDisplay`
-
-**⚠️ 重要**: 选择此风格需要额外配置自定义资源文件：
-1. `Xiaozhi Assistant` → `Flash Assets` → 选择 `Flash Custom Assets`
-2. `Xiaozhi Assistant` → `Custom Assets File` → 填入资源文件地址：
+**⚠️ Важно**: для этого стиля требуется указать собственный набор ресурсов:
+1. `Xiaozhi Assistant` → `Flash Assets` → `Flash Custom Assets`
+2. `Xiaozhi Assistant` → `Custom Assets File` → URL ресурса:
    ```
    https://dl.espressif.com/AE/wn9_nihaoxiaozhi_tts-font_puhui_common_20_4-echoear.bin
    ```
 
-##### 默认消息风格 (Enable default message style)
-- **配置选项**: `USE_DEFAULT_MESSAGE_STYLE` (默认)
-- **特点**: 使用标准的消息显示界面
-- **功能**: 传统的文本和图标显示界面
-- **适用**: 标准的对话场景
-- **类**: `SpiLcdDisplay`
+##### Стандартный стиль сообщений (Default message style)
+- **Опция**: `USE_DEFAULT_MESSAGE_STYLE` (по умолчанию)
+- **Описание**: классический экран с текстом и иконками
+- **Класс**: `SpiLcdDisplay`
 
-##### 微信消息风格 (Enable WeChat Message Style)
-- **配置选项**: `USE_WECHAT_MESSAGE_STYLE`
-- **特点**: 仿微信聊天界面风格
-- **功能**: 类似微信的消息气泡显示
-- **适用**: 喜欢微信风格的用户
-- **类**: `SpiLcdDisplay`
+##### Стиль WeChat (WeChat message style)
+- **Опция**: `USE_WECHAT_MESSAGE_STYLE`
+- **Описание**: интерфейс в стиле мессенджера WeChat
+- **Применение**: для пользователей, предпочитающих подобный дизайн
+- **Класс**: `SpiLcdDisplay`
 
-> **说明**: EchoEar 使用16MB Flash，需要使用专门的分区表配置来合理分配存储空间给应用程序、OTA更新、资源文件等。
+> **Примечание**: EchoEar оснащён флешем 16 МБ, поэтому требуется специальная таблица разделов для распределения OTA, приложений и ресурсов.
 
-按 `S` 保存，按 `Q` 退出。
+Сохраните настройки (`S`), выйдите (`Q`).
 
-**编译**
+**Сборка**
 
 ```bash
 idf.py build
 ```
 
-**烧录**
+**Прошивка**
 
-将 EchoEar 连接至电脑，**注意打开电源**，并运行：
+Подключите EchoEar к компьютеру, **включите питание** и выполните:
 
 ```bash
 idf.py flash
