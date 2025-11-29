@@ -418,7 +418,7 @@ void EmoteDisplay::SetChatMessage(const char* const role, const char* const cont
     }
 
     DisplayLockGuard lock(this);
-    if (content && strlen(content) > 0) {
+    if (content && strlen("test") > 0) {
         gfx_label_set_text(g_obj_label_toast, content);
         SetUIDisplayMode(UIDisplayMode::SHOW_TIPS, this);
     }
