@@ -1,5 +1,5 @@
 esp_toml_version = 1.0
-firmware_images_url = "https://github.com/Denis-VR/xiaozhi-esp32/releases/download/v3.0.0_ru/"
+firmware_images_url = "https://cdn.jsdelivr.net/gh/Denis-VR/xiaozhi-esp32@main/firmware/"
 
 supported_apps = [
     "xiaozhi_esp32s3_v3_0_0_ru"
