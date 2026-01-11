@@ -6,7 +6,8 @@ supported_apps = [
 ]
 
 [xiaozhi_esp32s3_v3_0_0_ru]
-chipsets = ["ESP32-S3"]
+chipsets = ["ESP32-S3", "ESP32-S3-NOBASE"]
 image.esp32-s3 = "v3.0.0_ru.bin"
+image.esp32-s3-nobase = "NoBase_v2.0.3-2_ru.bin"
 android_app_url = ""
 ios_app_url = ""
