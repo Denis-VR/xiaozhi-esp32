@@ -13,7 +13,7 @@ EchoEar 喵伴 — интеллектуальный AI‑набор на баз�
 **Выбор целевого чипа ESP32-S3**
 
 ```bash
-source ~/esp/esp-idf/export.sh     
+source ~/esp/esp-idf/export.sh
 idf.py set-target esp32s3
 ```
 
@@ -81,5 +81,5 @@ idf.py flash
 Просмотр логов:
 
 ```bash
-idf.py monitor 
+idf.py monitor
 ```
