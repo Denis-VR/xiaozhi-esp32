@@ -83,3 +83,9 @@ idf.py flash
 ```bash
 idf.py monitor
 ```
+
+Собрать единый bin чтобы можно было загрузить его через Launchpad:
+
+```bash
+idf.py merge-bin -o xiaozhi-echoear.bin -f raw
+```
