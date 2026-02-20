@@ -302,6 +302,15 @@ LcdDisplay::~LcdDisplay() {
         esp_timer_delete(preview_timer_);
     }
 
+    if (progress_arc_ != nullptr) {
+        lv_obj_del(progress_arc_);
+    }
+    if (progress_pct_label_ != nullptr) {
+        lv_obj_del(progress_pct_label_);
+    }
+    if (progress_name_label_ != nullptr) {
+        lv_obj_del(progress_name_label_);
+    }
     if (preview_image_ != nullptr) {
         lv_obj_del(preview_image_);
     }
@@ -775,154 +784,46 @@ void LcdDisplay::SetupUI() {
     DisplayLockGuard lock(this);
     LvglTheme* lvgl_theme = static_cast<LvglTheme*>(current_theme_);
     auto text_font = lvgl_theme->text_font()->font();
-    auto icon_font = lvgl_theme->icon_font()->font();
-    auto large_icon_font = lvgl_theme->large_icon_font()->font();
 
     auto screen = lv_screen_active();
     lv_obj_set_style_text_font(screen, text_font, 0);
-    lv_obj_set_style_text_color(screen, lvgl_theme->text_color(), 0);
-    lv_obj_set_style_bg_color(screen, lvgl_theme->background_color(), 0);
 
-    /* Container - used as background */
-    container_ = lv_obj_create(screen);
-    lv_obj_set_size(container_, LV_HOR_RES, LV_VER_RES);
-    lv_obj_set_style_radius(container_, 0, 0);
-    lv_obj_set_style_pad_all(container_, 0, 0);
-    lv_obj_set_style_border_width(container_, 0, 0);
-    lv_obj_set_style_bg_color(container_, lvgl_theme->background_color(), 0);
-    lv_obj_set_style_border_color(container_, lvgl_theme->border_color(), 0);
+    // Black background for progress-only display
+    lv_obj_set_style_bg_color(screen, lv_color_black(), 0);
+    lv_obj_set_style_text_color(screen, lv_color_white(), 0);
 
-    /* Bottom layer: emoji_box_ - centered display */
-    emoji_box_ = lv_obj_create(screen);
-    lv_obj_set_size(emoji_box_, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
-    lv_obj_set_style_bg_opa(emoji_box_, LV_OPA_TRANSP, 0);
-    lv_obj_set_style_pad_all(emoji_box_, 0, 0);
-    lv_obj_set_style_border_width(emoji_box_, 0, 0);
-    lv_obj_align(emoji_box_, LV_ALIGN_CENTER, 0, 0);
+    // === Notion Progress Arc ===
+    progress_arc_ = lv_arc_create(screen);
+    lv_obj_set_size(progress_arc_, 340, 340);
+    lv_obj_align(progress_arc_, LV_ALIGN_CENTER, 0, 0);
+    lv_arc_set_rotation(progress_arc_, 270);
+    lv_arc_set_bg_angles(progress_arc_, 0, 360);
+    lv_arc_set_range(progress_arc_, 0, 100);
+    lv_arc_set_value(progress_arc_, 0);
+    // Track (background arc)
+    lv_obj_set_style_arc_width(progress_arc_, 12, LV_PART_MAIN);
+    lv_obj_set_style_arc_color(progress_arc_, lv_color_hex(0x222222), LV_PART_MAIN);
+    // Indicator (filled arc)
+    lv_obj_set_style_arc_width(progress_arc_, 12, LV_PART_INDICATOR);
+    lv_obj_set_style_arc_color(progress_arc_, lv_color_hex(0x00CC66), LV_PART_INDICATOR);
+    // Hide knob
+    lv_obj_set_style_pad_all(progress_arc_, 0, LV_PART_KNOB);
+    lv_obj_set_style_bg_opa(progress_arc_, LV_OPA_TRANSP, LV_PART_KNOB);
+    lv_obj_remove_flag(progress_arc_, LV_OBJ_FLAG_CLICKABLE);
 
-    emoji_label_ = lv_label_create(emoji_box_);
-    lv_obj_set_style_text_font(emoji_label_, large_icon_font, 0);
-    lv_obj_set_style_text_color(emoji_label_, lvgl_theme->text_color(), 0);
-    lv_label_set_text(emoji_label_, FONT_AWESOME_MICROCHIP_AI);
+    // Large percentage label in the center
+    progress_pct_label_ = lv_label_create(screen);
+    lv_obj_set_style_text_font(progress_pct_label_, text_font, 0);
+    lv_obj_set_style_text_color(progress_pct_label_, lv_color_hex(0x00CC66), 0);
+    lv_label_set_text(progress_pct_label_, "Loading...");
+    lv_obj_align(progress_pct_label_, LV_ALIGN_CENTER, 0, -10);
 
-    emoji_image_ = lv_img_create(emoji_box_);
-    lv_obj_center(emoji_image_);
-    lv_obj_add_flag(emoji_image_, LV_OBJ_FLAG_HIDDEN);
-
-    /* Middle layer: preview_image_ - centered display */
-    preview_image_ = lv_image_create(screen);
-    lv_obj_set_size(preview_image_, width_ / 2, height_ / 2);
-    lv_obj_align(preview_image_, LV_ALIGN_CENTER, 0, 0);
-    lv_obj_add_flag(preview_image_, LV_OBJ_FLAG_HIDDEN);
-
-    /* Layer 1: Top bar - for status icons */
-    top_bar_ = lv_obj_create(screen);
-    lv_obj_set_size(top_bar_, LV_HOR_RES, LV_SIZE_CONTENT);
-    lv_obj_set_style_radius(top_bar_, 0, 0);
-    lv_obj_set_style_bg_opa(top_bar_, LV_OPA_50, 0);  // 50% opacity background
-    lv_obj_set_style_bg_color(top_bar_, lvgl_theme->background_color(), 0);
-    lv_obj_set_style_border_width(top_bar_, 0, 0);
-    lv_obj_set_style_pad_all(top_bar_, 0, 0);
-    lv_obj_set_style_pad_top(top_bar_, lvgl_theme->spacing(2), 0);
-    lv_obj_set_style_pad_bottom(top_bar_, lvgl_theme->spacing(2), 0);
-    lv_obj_set_style_pad_left(top_bar_, lvgl_theme->spacing(4), 0);
-    lv_obj_set_style_pad_right(top_bar_, lvgl_theme->spacing(4), 0);
-    lv_obj_set_flex_flow(top_bar_, LV_FLEX_FLOW_ROW);
-    lv_obj_set_flex_align(top_bar_, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-    lv_obj_set_scrollbar_mode(top_bar_, LV_SCROLLBAR_MODE_OFF);
-    lv_obj_align(top_bar_, LV_ALIGN_TOP_MID, 0, 0);
-
-    // Left icon
-    network_label_ = lv_label_create(top_bar_);
-    lv_label_set_text(network_label_, "");
-    lv_obj_set_style_text_font(network_label_, icon_font, 0);
-    lv_obj_set_style_text_color(network_label_, lvgl_theme->text_color(), 0);
-
-    // Right icons container
-    lv_obj_t* right_icons = lv_obj_create(top_bar_);
-    lv_obj_set_size(right_icons, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
-    lv_obj_set_style_bg_opa(right_icons, LV_OPA_TRANSP, 0);
-    lv_obj_set_style_border_width(right_icons, 0, 0);
-    lv_obj_set_style_pad_all(right_icons, 0, 0);
-    lv_obj_set_flex_flow(right_icons, LV_FLEX_FLOW_ROW);
-    lv_obj_set_flex_align(right_icons, LV_FLEX_ALIGN_END, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-
-    mute_label_ = lv_label_create(right_icons);
-    lv_label_set_text(mute_label_, "");
-    lv_obj_set_style_text_font(mute_label_, icon_font, 0);
-    lv_obj_set_style_text_color(mute_label_, lvgl_theme->text_color(), 0);
-
-    battery_label_ = lv_label_create(right_icons);
-    lv_label_set_text(battery_label_, "");
-    lv_obj_set_style_text_font(battery_label_, icon_font, 0);
-    lv_obj_set_style_text_color(battery_label_, lvgl_theme->text_color(), 0);
-    lv_obj_set_style_margin_left(battery_label_, lvgl_theme->spacing(2), 0);
-
-    /* Layer 2: Status bar - for center text labels */
-    status_bar_ = lv_obj_create(screen);
-    lv_obj_set_size(status_bar_, LV_HOR_RES, LV_SIZE_CONTENT);
-    lv_obj_set_style_radius(status_bar_, 0, 0);
-    lv_obj_set_style_bg_opa(status_bar_, LV_OPA_TRANSP, 0);  // Transparent background
-    lv_obj_set_style_border_width(status_bar_, 0, 0);
-    lv_obj_set_style_pad_all(status_bar_, 0, 0);
-    lv_obj_set_style_pad_top(status_bar_, lvgl_theme->spacing(2), 0);
-    lv_obj_set_style_pad_bottom(status_bar_, lvgl_theme->spacing(2), 0);
-    lv_obj_set_scrollbar_mode(status_bar_, LV_SCROLLBAR_MODE_OFF);
-    lv_obj_set_style_layout(status_bar_, LV_LAYOUT_NONE, 0);  // Use absolute positioning
-    lv_obj_align(status_bar_, LV_ALIGN_TOP_MID, 0, 0);  // Overlap with top_bar_
-
-    notification_label_ = lv_label_create(status_bar_);
-    lv_obj_set_width(notification_label_, LV_HOR_RES * 0.75);
-    lv_obj_set_style_text_align(notification_label_, LV_TEXT_ALIGN_CENTER, 0);
-    lv_obj_set_style_text_color(notification_label_, lvgl_theme->text_color(), 0);
-    lv_label_set_text(notification_label_, "");
-    lv_obj_align(notification_label_, LV_ALIGN_CENTER, 0, 0);
-    lv_obj_add_flag(notification_label_, LV_OBJ_FLAG_HIDDEN);
-
-    status_label_ = lv_label_create(status_bar_);
-    lv_obj_set_width(status_label_, LV_HOR_RES * 0.75);
-    lv_label_set_long_mode(status_label_, LV_LABEL_LONG_SCROLL_CIRCULAR);
-    lv_obj_set_style_text_align(status_label_, LV_TEXT_ALIGN_CENTER, 0);
-    lv_obj_set_style_text_color(status_label_, lvgl_theme->text_color(), 0);
-    lv_label_set_text(status_label_, Lang::Strings::INITIALIZING);
-    lv_obj_align(status_label_, LV_ALIGN_CENTER, 0, 0);
-
-    /* Top layer: Bottom bar - fixed at bottom, minimum height 48, height can be adaptive */
-    bottom_bar_ = lv_obj_create(screen);
-    lv_obj_set_width(bottom_bar_, LV_HOR_RES);
-    lv_obj_set_height(bottom_bar_, LV_SIZE_CONTENT);
-    lv_obj_set_style_min_height(bottom_bar_, 48, 0); // Set minimum height 48
-    lv_obj_set_style_radius(bottom_bar_, 0, 0);
-    lv_obj_set_style_bg_color(bottom_bar_, lvgl_theme->background_color(), 0);
-    lv_obj_set_style_text_color(bottom_bar_, lvgl_theme->text_color(), 0);
-    lv_obj_set_style_pad_top(bottom_bar_, lvgl_theme->spacing(2), 0);
-    lv_obj_set_style_pad_bottom(bottom_bar_, lvgl_theme->spacing(2), 0);
-    lv_obj_set_style_pad_left(bottom_bar_, lvgl_theme->spacing(4), 0);
-    lv_obj_set_style_pad_right(bottom_bar_, lvgl_theme->spacing(4), 0);
-    lv_obj_set_style_border_width(bottom_bar_, 0, 0);
-    lv_obj_align(bottom_bar_, LV_ALIGN_BOTTOM_MID, 0, 0);
-
-    /* chat_message_label_ placed in bottom_bar_ and vertically centered */
-    chat_message_label_ = lv_label_create(bottom_bar_);
-    lv_label_set_text(chat_message_label_, "");
-    lv_obj_set_width(chat_message_label_, LV_HOR_RES - lvgl_theme->spacing(8)); // Subtract left and right padding
-    lv_label_set_long_mode(chat_message_label_, LV_LABEL_LONG_WRAP); // Auto wrap mode
-    lv_obj_set_style_text_align(chat_message_label_, LV_TEXT_ALIGN_CENTER, 0); // Center text alignment
-    lv_obj_set_style_text_color(chat_message_label_, lvgl_theme->text_color(), 0);
-    lv_obj_align(chat_message_label_, LV_ALIGN_CENTER, 0, 0); // Vertically and horizontally centered in bottom_bar_
-
-    low_battery_popup_ = lv_obj_create(screen);
-    lv_obj_set_scrollbar_mode(low_battery_popup_, LV_SCROLLBAR_MODE_OFF);
-    lv_obj_set_size(low_battery_popup_, LV_HOR_RES * 0.9, text_font->line_height * 2);
-    lv_obj_align(low_battery_popup_, LV_ALIGN_BOTTOM_MID, 0, -lvgl_theme->spacing(4));
-    lv_obj_set_style_bg_color(low_battery_popup_, lvgl_theme->low_battery_color(), 0);
-    lv_obj_set_style_radius(low_battery_popup_, lvgl_theme->spacing(4), 0);
-    
-    low_battery_label_ = lv_label_create(low_battery_popup_);
-    lv_label_set_text(low_battery_label_, Lang::Strings::BATTERY_NEED_CHARGE);
-    lv_obj_set_style_text_color(low_battery_label_, lv_color_white(), 0);
-    lv_obj_center(low_battery_label_);
-    lv_obj_add_flag(low_battery_popup_, LV_OBJ_FLAG_HIDDEN);
+    // Category name label below percentage
+    progress_name_label_ = lv_label_create(screen);
+    lv_obj_set_style_text_font(progress_name_label_, text_font, 0);
+    lv_obj_set_style_text_color(progress_name_label_, lv_color_hex(0x888888), 0);
+    lv_label_set_text(progress_name_label_, "");
+    lv_obj_align(progress_name_label_, LV_ALIGN_CENTER, 0, 20);
 }
 
 void LcdDisplay::SetPreviewImage(std::unique_ptr<LvglImage> image) {
@@ -969,6 +870,40 @@ void LcdDisplay::SetChatMessage(const char* role, const char* content) {
     lv_label_set_text(chat_message_label_, content);
 }
 #endif
+
+void LcdDisplay::UpdateNotionProgress(float progress, const std::string& category_name) {
+    DisplayLockGuard lock(this);
+    if (progress_arc_ == nullptr) {
+        return;
+    }
+
+    int pct = (int)(progress * 100.0f);
+    if (pct < 0) pct = 0;
+    if (pct > 100) pct = 100;
+
+    lv_arc_set_value(progress_arc_, pct);
+
+    // Color gradient: red(0%) -> yellow(50%) -> green(100%)
+    uint8_t r, g;
+    if (pct < 50) {
+        r = 255;
+        g = (uint8_t)(pct * 5.1f);
+    } else {
+        r = (uint8_t)((100 - pct) * 5.1f);
+        g = 255;
+    }
+    lv_color_t arc_color = lv_color_make(r, g, 0x00);
+    lv_obj_set_style_arc_color(progress_arc_, arc_color, LV_PART_INDICATOR);
+
+    char pct_text[8];
+    snprintf(pct_text, sizeof(pct_text), "%d%%", pct);
+    lv_label_set_text(progress_pct_label_, pct_text);
+    lv_obj_set_style_text_color(progress_pct_label_, arc_color, 0);
+    lv_obj_align(progress_pct_label_, LV_ALIGN_CENTER, 0, -10);
+
+    lv_label_set_text(progress_name_label_, category_name.c_str());
+    lv_obj_align(progress_name_label_, LV_ALIGN_CENTER, 0, 20);
+}
 
 void LcdDisplay::SetEmotion(const char* emotion) {
     // Stop any running GIF animation
@@ -1052,14 +987,16 @@ void LcdDisplay::SetTheme(Theme* theme) {
     auto icon_font = lvgl_theme->icon_font()->font();
     auto large_icon_font = lvgl_theme->large_icon_font()->font();
 
-    if (text_font->line_height >= 40) {
-        lv_obj_set_style_text_font(mute_label_, large_icon_font, 0);
-        lv_obj_set_style_text_font(battery_label_, large_icon_font, 0);
-        lv_obj_set_style_text_font(network_label_, large_icon_font, 0);
-    } else {
-        lv_obj_set_style_text_font(mute_label_, icon_font, 0);
-        lv_obj_set_style_text_font(battery_label_, icon_font, 0);
-        lv_obj_set_style_text_font(network_label_, icon_font, 0);
+    if (mute_label_ != nullptr && battery_label_ != nullptr && network_label_ != nullptr) {
+        if (text_font->line_height >= 40) {
+            lv_obj_set_style_text_font(mute_label_, large_icon_font, 0);
+            lv_obj_set_style_text_font(battery_label_, large_icon_font, 0);
+            lv_obj_set_style_text_font(network_label_, large_icon_font, 0);
+        } else {
+            lv_obj_set_style_text_font(mute_label_, icon_font, 0);
+            lv_obj_set_style_text_font(battery_label_, icon_font, 0);
+            lv_obj_set_style_text_font(network_label_, icon_font, 0);
+        }
     }
 
     // Set parent text color
@@ -1067,26 +1004,34 @@ void LcdDisplay::SetTheme(Theme* theme) {
     lv_obj_set_style_text_color(screen, lvgl_theme->text_color(), 0);
 
     // Set background image
-    if (lvgl_theme->background_image() != nullptr) {
-        lv_obj_set_style_bg_image_src(container_, lvgl_theme->background_image()->image_dsc(), 0);
-    } else {
-        lv_obj_set_style_bg_image_src(container_, nullptr, 0);
-        lv_obj_set_style_bg_color(container_, lvgl_theme->background_color(), 0);
+    if (container_ != nullptr) {
+        if (lvgl_theme->background_image() != nullptr) {
+            lv_obj_set_style_bg_image_src(container_, lvgl_theme->background_image()->image_dsc(), 0);
+        } else {
+            lv_obj_set_style_bg_image_src(container_, nullptr, 0);
+            lv_obj_set_style_bg_color(container_, lvgl_theme->background_color(), 0);
+        }
     }
-    
+
     // Update top bar background color with 50% opacity
     if (top_bar_ != nullptr) {
         lv_obj_set_style_bg_opa(top_bar_, LV_OPA_50, 0);
         lv_obj_set_style_bg_color(top_bar_, lvgl_theme->background_color(), 0);
     }
-    
-    // Update status bar elements
-    lv_obj_set_style_text_color(network_label_, lvgl_theme->text_color(), 0);
-    lv_obj_set_style_text_color(status_label_, lvgl_theme->text_color(), 0);
-    lv_obj_set_style_text_color(notification_label_, lvgl_theme->text_color(), 0);
-    lv_obj_set_style_text_color(mute_label_, lvgl_theme->text_color(), 0);
-    lv_obj_set_style_text_color(battery_label_, lvgl_theme->text_color(), 0);
-    lv_obj_set_style_text_color(emoji_label_, lvgl_theme->text_color(), 0);
+
+    // Update status bar elements (skip if widgets not created)
+    if (network_label_ != nullptr)
+        lv_obj_set_style_text_color(network_label_, lvgl_theme->text_color(), 0);
+    if (status_label_ != nullptr)
+        lv_obj_set_style_text_color(status_label_, lvgl_theme->text_color(), 0);
+    if (notification_label_ != nullptr)
+        lv_obj_set_style_text_color(notification_label_, lvgl_theme->text_color(), 0);
+    if (mute_label_ != nullptr)
+        lv_obj_set_style_text_color(mute_label_, lvgl_theme->text_color(), 0);
+    if (battery_label_ != nullptr)
+        lv_obj_set_style_text_color(battery_label_, lvgl_theme->text_color(), 0);
+    if (emoji_label_ != nullptr)
+        lv_obj_set_style_text_color(emoji_label_, lvgl_theme->text_color(), 0);
 
     // If we have the chat message style, update all message bubbles
 #if CONFIG_USE_WECHAT_MESSAGE_STYLE
@@ -1175,7 +1120,8 @@ void LcdDisplay::SetTheme(Theme* theme) {
 #endif
     
     // Update low battery popup
-    lv_obj_set_style_bg_color(low_battery_popup_, lvgl_theme->low_battery_color(), 0);
+    if (low_battery_popup_ != nullptr)
+        lv_obj_set_style_bg_color(low_battery_popup_, lvgl_theme->low_battery_color(), 0);
 
     // No errors occurred. Save theme to settings
     Display::SetTheme(lvgl_theme);

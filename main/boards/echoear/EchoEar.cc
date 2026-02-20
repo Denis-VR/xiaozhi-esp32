@@ -2,6 +2,7 @@
 #include "codecs/box_audio_codec.h"
 #include "display/lcd_display.h"
 #include "display/emote_display.h"
+#include "notion_progress.h"
 #include "application.h"
 #include "button.h"
 #include "config.h"
@@ -390,6 +391,7 @@ private:
     PwmBacklight* backlight_ = nullptr;
     esp_timer_handle_t touchpad_timer_;
     esp_lcd_touch_handle_t tp;   // LCD touch handle
+    NotionProgress* notion_progress_ = nullptr;
 
     void InitializeI2c()
     {
@@ -594,6 +596,20 @@ public:
         InitializeSpi();
         Initializest77916Display(pcb_verison);
         InitializeButtons();
+
+        // Start Notion progress fetcher
+        notion_progress_ = new NotionProgress();
+        notion_progress_->Start([this](float progress, const std::string& name) {
+            ESP_LOGI(TAG, "Notion callback: progress=%.1f%%, name=%s, display_=%p",
+                     progress * 100.0f, name.c_str(), display_);
+            auto lcd = dynamic_cast<LcdDisplay*>(display_);
+            if (lcd) {
+                ESP_LOGI(TAG, "Updating LcdDisplay with progress");
+                lcd->UpdateNotionProgress(progress, name);
+            } else {
+                ESP_LOGW(TAG, "display_ is not LcdDisplay, dynamic_cast failed");
+            }
+        });
     }
 
     virtual AudioCodec* GetAudioCodec() override

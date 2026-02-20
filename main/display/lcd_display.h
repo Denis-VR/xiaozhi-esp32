@@ -10,6 +10,7 @@
 
 #include <atomic>
 #include <memory>
+#include <string>
 
 #define PREVIEW_IMAGE_DURATION_MS 5000
 
@@ -36,6 +37,11 @@ protected:
     std::unique_ptr<LvglImage> preview_image_cached_ = nullptr;
     bool hide_subtitle_ = false;  // Control whether to hide chat messages/subtitles
 
+    // Notion progress overlay widgets
+    lv_obj_t* progress_arc_ = nullptr;
+    lv_obj_t* progress_pct_label_ = nullptr;
+    lv_obj_t* progress_name_label_ = nullptr;
+
     void InitializeLcdThemes();
     void SetupUI();
     virtual bool Lock(int timeout_ms = 0) override;
@@ -56,6 +62,9 @@ public:
     
     // Set whether to hide chat messages/subtitles
     void SetHideSubtitle(bool hide);
+
+    // Update the Notion progress display
+    void UpdateNotionProgress(float progress, const std::string& category_name);
 };
 
 // SPI LCD display
