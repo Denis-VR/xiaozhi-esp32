@@ -37,7 +37,7 @@ void NotionProgress::FetchTaskFunction(void* pvParameters) {
     NotionProgress* self = static_cast<NotionProgress*>(pvParameters);
 
     // Wait for network to connect
-    vTaskDelay(pdMS_TO_TICKS(30000));
+    vTaskDelay(pdMS_TO_TICKS(5000));
 
     while (self->running_) {
         if (self->FetchFromNotion()) {

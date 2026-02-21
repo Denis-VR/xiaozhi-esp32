@@ -20,6 +20,7 @@
 LV_FONT_DECLARE(BUILTIN_TEXT_FONT);
 LV_FONT_DECLARE(BUILTIN_ICON_FONT);
 LV_FONT_DECLARE(font_awesome_30_4);
+LV_FONT_DECLARE(font_puhui_30_4);
 
 void LcdDisplay::InitializeLcdThemes() {
     auto text_font = std::make_shared<LvglBuiltInFont>(&BUILTIN_TEXT_FONT);
@@ -813,17 +814,17 @@ void LcdDisplay::SetupUI() {
 
     // Large percentage label in the center
     progress_pct_label_ = lv_label_create(screen);
-    lv_obj_set_style_text_font(progress_pct_label_, text_font, 0);
+    lv_obj_set_style_text_font(progress_pct_label_, &font_puhui_30_4, 0);
     lv_obj_set_style_text_color(progress_pct_label_, lv_color_hex(0x00CC66), 0);
     lv_label_set_text(progress_pct_label_, "Loading...");
-    lv_obj_align(progress_pct_label_, LV_ALIGN_CENTER, 0, -10);
+    lv_obj_align(progress_pct_label_, LV_ALIGN_CENTER, 0, -15);
 
-    // Category name label below percentage
+    // Static "Goal" label below percentage
     progress_name_label_ = lv_label_create(screen);
     lv_obj_set_style_text_font(progress_name_label_, text_font, 0);
     lv_obj_set_style_text_color(progress_name_label_, lv_color_hex(0x888888), 0);
-    lv_label_set_text(progress_name_label_, "");
-    lv_obj_align(progress_name_label_, LV_ALIGN_CENTER, 0, 20);
+    lv_label_set_text(progress_name_label_, "Goal");
+    lv_obj_align(progress_name_label_, LV_ALIGN_CENTER, 0, 25);
 }
 
 void LcdDisplay::SetPreviewImage(std::unique_ptr<LvglImage> image) {
@@ -899,10 +900,8 @@ void LcdDisplay::UpdateNotionProgress(float progress, const std::string& categor
     snprintf(pct_text, sizeof(pct_text), "%d%%", pct);
     lv_label_set_text(progress_pct_label_, pct_text);
     lv_obj_set_style_text_color(progress_pct_label_, arc_color, 0);
-    lv_obj_align(progress_pct_label_, LV_ALIGN_CENTER, 0, -10);
-
-    lv_label_set_text(progress_name_label_, category_name.c_str());
-    lv_obj_align(progress_name_label_, LV_ALIGN_CENTER, 0, 20);
+    lv_obj_align(progress_pct_label_, LV_ALIGN_CENTER, 0, -15);
+    lv_obj_align(progress_name_label_, LV_ALIGN_CENTER, 0, 25);
 }
 
 void LcdDisplay::SetEmotion(const char* emotion) {
