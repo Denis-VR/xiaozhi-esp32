@@ -37,7 +37,7 @@ void NotionProgress::FetchTaskFunction(void* pvParameters) {
     NotionProgress* self = static_cast<NotionProgress*>(pvParameters);
 
     // Wait for network to connect
-    vTaskDelay(pdMS_TO_TICKS(5000));
+    vTaskDelay(pdMS_TO_TICKS(15000));
 
     while (self->running_) {
         if (self->FetchFromNotion()) {
@@ -73,8 +73,7 @@ bool NotionProgress::FetchFromNotion() {
     http->SetHeader("Notion-Version", "2022-06-28");
     http->SetHeader("Content-Type", "application/json");
 
-    std::string body = "{}";
-    http->SetContent(std::move(body));
+    http->SetContent(std::string("{}"));
 
     std::string url = "https://api.notion.com/v1/databases/";
     url += NOTION_DATABASE_ID;
@@ -128,56 +127,36 @@ bool NotionProgress::FetchFromNotion() {
 
     bool success = false;
     cJSON* results = cJSON_GetObjectItem(root, "results");
-    if (cJSON_IsArray(results)) {
-        int count = cJSON_GetArraySize(results);
-        ESP_LOGI(TAG, "Results array size: %d", count);
+    int result_count = cJSON_IsArray(results) ? cJSON_GetArraySize(results) : 0;
+    ESP_LOGI(TAG, "Results count: %d", result_count);
+    for (int i = 0; i < result_count; i++) {
+        cJSON* item = cJSON_GetArrayItem(results, i);
+        cJSON* properties = cJSON_GetObjectItem(item, "properties");
+        if (!properties) continue;
 
-        if (count > 0) {
-            cJSON* first_result = cJSON_GetArrayItem(results, 0);
-            cJSON* properties = cJSON_GetObjectItem(first_result, "properties");
+        cJSON* name_prop = cJSON_GetObjectItemCaseSensitive(properties, "Name");
+        cJSON* title_arr = name_prop ? cJSON_GetObjectItem(name_prop, "title") : nullptr;
+        cJSON* title0 = (title_arr && cJSON_IsArray(title_arr)) ? cJSON_GetArrayItem(title_arr, 0) : nullptr;
+        cJSON* plain_text = title0 ? cJSON_GetObjectItem(title0, "plain_text") : nullptr;
+        if (!plain_text || !cJSON_IsString(plain_text)) continue;
 
-            if (!properties) {
-                ESP_LOGW(TAG, "No 'properties' in first result");
-            } else {
-                // Extract Progress
-                cJSON* progress_prop = cJSON_GetObjectItem(properties, "Progress");
-                if (progress_prop) {
-                    cJSON* rollup = cJSON_GetObjectItem(progress_prop, "rollup");
-                    if (rollup) {
-                        cJSON* number = cJSON_GetObjectItem(rollup, "number");
-                        if (cJSON_IsNumber(number)) {
-                            progress_ = (float)number->valuedouble;
-                            success = true;
-                            ESP_LOGI(TAG, "Parsed progress: %f", number->valuedouble);
-                        } else {
-                            ESP_LOGW(TAG, "Progress.rollup.number is not a number");
-                        }
-                    } else {
-                        ESP_LOGW(TAG, "Progress.rollup not found");
-                    }
-                } else {
-                    ESP_LOGW(TAG, "Progress property not found");
-                }
+        ESP_LOGI(TAG, "Entry [%d]: %s", i, plain_text->valuestring);
+        if (strcmp(plain_text->valuestring, "Must Have") != 0) continue;
 
-                // Extract Name
-                cJSON* name_prop = cJSON_GetObjectItem(properties, "Name");
-                if (name_prop) {
-                    cJSON* title = cJSON_GetObjectItem(name_prop, "title");
-                    if (cJSON_IsArray(title) && cJSON_GetArraySize(title) > 0) {
-                        cJSON* first_title = cJSON_GetArrayItem(title, 0);
-                        cJSON* plain_text = cJSON_GetObjectItem(first_title, "plain_text");
-                        if (cJSON_IsString(plain_text)) {
-                            category_name_ = plain_text->valuestring;
-                            ESP_LOGI(TAG, "Parsed category: %s", category_name_.c_str());
-                        }
-                    }
-                } else {
-                    ESP_LOGW(TAG, "Name property not found");
-                }
-            }
+        cJSON* progress_prop = cJSON_GetObjectItemCaseSensitive(properties, "Progress");
+        cJSON* rollup = progress_prop ? cJSON_GetObjectItemCaseSensitive(progress_prop, "rollup") : nullptr;
+        cJSON* number = rollup ? cJSON_GetObjectItemCaseSensitive(rollup, "number") : nullptr;
+        if (cJSON_IsNumber(number)) {
+            progress_ = (float)number->valuedouble;
+            success = true;
+            ESP_LOGI(TAG, "Progress: %f (pct: %d%%)", number->valuedouble, (int)(number->valuedouble * 100.0));
+        } else {
+            ESP_LOGW(TAG, "Progress.rollup.number not found");
         }
-    } else {
-        ESP_LOGW(TAG, "No 'results' array in response");
+        break;
+    }
+    if (!success) {
+        ESP_LOGW(TAG, "'Must Have' not found in %d results", result_count);
     }
 
     cJSON_Delete(root);

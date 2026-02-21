@@ -42,6 +42,19 @@ protected:
     lv_obj_t* progress_pct_label_ = nullptr;
     lv_obj_t* progress_name_label_ = nullptr;
 
+    // Pomodoro timer widgets and state
+    lv_obj_t* pomodoro_time_label_ = nullptr;
+    esp_timer_handle_t pomodoro_timer_ = nullptr;
+    std::atomic<int> pomodoro_seconds_remaining_{25 * 60};
+    std::atomic<bool> pomodoro_mode_{false};
+
+    // Last known Notion progress (to restore when exiting Pomodoro)
+    float last_notion_progress_{0.0f};
+    std::string last_notion_category_{"Goal"};
+
+    void UpdatePomodoroDisplay();
+    static void PomodoroTimerCallback(void* arg);
+
     void InitializeLcdThemes();
     void SetupUI();
     virtual bool Lock(int timeout_ms = 0) override;
@@ -65,6 +78,9 @@ public:
 
     // Update the Notion progress display
     void UpdateNotionProgress(float progress, const std::string& category_name);
+
+    // Toggle between Notion progress and Pomodoro timer mode
+    void TogglePomodoroMode();
 };
 
 // SPI LCD display

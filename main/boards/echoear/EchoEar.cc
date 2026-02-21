@@ -467,6 +467,9 @@ private:
             return;
         }
 
+        TickType_t press_start_time = 0;
+        bool tracking_press = false;
+
         while (true) {
             if (touchpad->WaitForTouchEvent()) {
                 auto &app = Application::GetInstance();
@@ -476,12 +479,32 @@ private:
                 touchpad->UpdateTouchPoint();
                 auto touch_event = touchpad->CheckTouchEvent();
 
+                if (touch_event == Cst816s::TOUCH_PRESS) {
+                    if (!tracking_press) {
+                        press_start_time = xTaskGetTickCount();
+                        tracking_press = true;
+                    }
+                }
+
                 if (touch_event == Cst816s::TOUCH_RELEASE) {
-                    if (app.GetDeviceState() == kDeviceStateStarting &&
-                            !WifiStation::GetInstance().IsConnected()) {
-                        board.ResetWifiConfiguration();
+                    TickType_t held_ticks = tracking_press ? (xTaskGetTickCount() - press_start_time) : 0;
+                    tracking_press = false;
+
+                    if (held_ticks >= pdMS_TO_TICKS(1500)) {
+                        // Long press — toggle Pomodoro mode
+                        auto lcd = dynamic_cast<LcdDisplay*>(board.GetDisplay());
+                        if (lcd) {
+                            ESP_LOGI(TAG, "Long touch press — toggling Pomodoro mode");
+                            lcd->TogglePomodoroMode();
+                        }
                     } else {
-                        app.ToggleChatState();
+                        // Short tap — existing behavior
+                        if (app.GetDeviceState() == kDeviceStateStarting &&
+                                !WifiStation::GetInstance().IsConnected()) {
+                            board.ResetWifiConfiguration();
+                        } else {
+                            app.ToggleChatState();
+                        }
                     }
                 }
             }
@@ -574,6 +597,12 @@ private:
                 ResetWifiConfiguration();
             }
             app.ToggleChatState();
+        });
+        boot_button_.OnDoubleClick([this]() {
+            auto lcd = dynamic_cast<LcdDisplay*>(display_);
+            if (lcd) {
+                lcd->TogglePomodoroMode();
+            }
         });
         gpio_config_t power_gpio_config = {
             .pin_bit_mask = (BIT64(POWER_CTRL)),

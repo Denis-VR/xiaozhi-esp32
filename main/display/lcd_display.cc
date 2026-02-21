@@ -20,7 +20,6 @@
 LV_FONT_DECLARE(BUILTIN_TEXT_FONT);
 LV_FONT_DECLARE(BUILTIN_ICON_FONT);
 LV_FONT_DECLARE(font_awesome_30_4);
-LV_FONT_DECLARE(font_puhui_30_4);
 
 void LcdDisplay::InitializeLcdThemes() {
     auto text_font = std::make_shared<LvglBuiltInFont>(&BUILTIN_TEXT_FONT);
@@ -303,6 +302,14 @@ LcdDisplay::~LcdDisplay() {
         esp_timer_delete(preview_timer_);
     }
 
+    if (pomodoro_timer_ != nullptr) {
+        esp_timer_stop(pomodoro_timer_);
+        esp_timer_delete(pomodoro_timer_);
+    }
+
+    if (pomodoro_time_label_ != nullptr) {
+        lv_obj_del(pomodoro_time_label_);
+    }
     if (progress_arc_ != nullptr) {
         lv_obj_del(progress_arc_);
     }
@@ -814,7 +821,7 @@ void LcdDisplay::SetupUI() {
 
     // Large percentage label in the center
     progress_pct_label_ = lv_label_create(screen);
-    lv_obj_set_style_text_font(progress_pct_label_, &font_puhui_30_4, 0);
+    lv_obj_set_style_text_font(progress_pct_label_, &lv_font_montserrat_32, 0);
     lv_obj_set_style_text_color(progress_pct_label_, lv_color_hex(0x00CC66), 0);
     lv_label_set_text(progress_pct_label_, "Loading...");
     lv_obj_align(progress_pct_label_, LV_ALIGN_CENTER, 0, -15);
@@ -825,6 +832,14 @@ void LcdDisplay::SetupUI() {
     lv_obj_set_style_text_color(progress_name_label_, lv_color_hex(0x888888), 0);
     lv_label_set_text(progress_name_label_, "Goal");
     lv_obj_align(progress_name_label_, LV_ALIGN_CENTER, 0, 25);
+
+    // Pomodoro countdown label (hidden by default, shown in pomodoro mode)
+    pomodoro_time_label_ = lv_label_create(screen);
+    lv_obj_set_style_text_font(pomodoro_time_label_, &lv_font_montserrat_32, 0);
+    lv_obj_set_style_text_color(pomodoro_time_label_, lv_color_hex(0xFF3030), 0);
+    lv_label_set_text(pomodoro_time_label_, "25:00");
+    lv_obj_align(pomodoro_time_label_, LV_ALIGN_CENTER, 0, -15);
+    lv_obj_add_flag(pomodoro_time_label_, LV_OBJ_FLAG_HIDDEN);
 }
 
 void LcdDisplay::SetPreviewImage(std::unique_ptr<LvglImage> image) {
@@ -873,6 +888,13 @@ void LcdDisplay::SetChatMessage(const char* role, const char* content) {
 #endif
 
 void LcdDisplay::UpdateNotionProgress(float progress, const std::string& category_name) {
+    last_notion_progress_ = progress;
+    last_notion_category_ = category_name;
+
+    if (pomodoro_mode_.load()) {
+        return;  // Don't touch the display while Pomodoro is running
+    }
+
     DisplayLockGuard lock(this);
     if (progress_arc_ == nullptr) {
         return;
@@ -901,7 +923,107 @@ void LcdDisplay::UpdateNotionProgress(float progress, const std::string& categor
     lv_label_set_text(progress_pct_label_, pct_text);
     lv_obj_set_style_text_color(progress_pct_label_, arc_color, 0);
     lv_obj_align(progress_pct_label_, LV_ALIGN_CENTER, 0, -15);
+    lv_label_set_text(progress_name_label_, category_name.empty() ? "Goal" : category_name.c_str());
+    lv_obj_set_style_text_color(progress_name_label_, lv_color_hex(0x888888), 0);
     lv_obj_align(progress_name_label_, LV_ALIGN_CENTER, 0, 25);
+}
+
+void LcdDisplay::TogglePomodoroMode() {
+    bool entering = !pomodoro_mode_.load();
+    pomodoro_mode_.store(entering);
+
+    if (entering) {
+        pomodoro_seconds_remaining_.store(25 * 60);
+
+        // Create the esp_timer on first use
+        if (pomodoro_timer_ == nullptr) {
+            const esp_timer_create_args_t timer_args = {
+                .callback = &LcdDisplay::PomodoroTimerCallback,
+                .arg = this,
+                .dispatch_method = ESP_TIMER_TASK,
+                .name = "pomodoro_timer",
+                .skip_unhandled_events = false,
+            };
+            esp_timer_create(&timer_args, &pomodoro_timer_);
+        }
+        esp_timer_start_periodic(pomodoro_timer_, 1000000ULL); // 1 second
+
+        DisplayLockGuard lock(this);
+        lv_obj_remove_flag(pomodoro_time_label_, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(progress_pct_label_, LV_OBJ_FLAG_HIDDEN);
+        lv_label_set_text(progress_name_label_, "POMODORO");
+        lv_obj_set_style_text_color(progress_name_label_, lv_color_hex(0x888888), 0);
+        lv_arc_set_value(progress_arc_, 0);
+        lv_obj_set_style_arc_color(progress_arc_, lv_color_hex(0xFF3030), LV_PART_INDICATOR);
+        lv_label_set_text(pomodoro_time_label_, "25:00");
+        lv_obj_set_style_text_color(pomodoro_time_label_, lv_color_hex(0xFF3030), 0);
+        lv_obj_align(pomodoro_time_label_, LV_ALIGN_CENTER, 0, -15);
+    } else {
+        if (pomodoro_timer_ != nullptr) {
+            esp_timer_stop(pomodoro_timer_);
+        }
+        {
+            DisplayLockGuard lock(this);
+            lv_obj_add_flag(pomodoro_time_label_, LV_OBJ_FLAG_HIDDEN);
+            lv_obj_remove_flag(progress_pct_label_, LV_OBJ_FLAG_HIDDEN);
+        }
+        // Restore Notion progress with last known values
+        UpdateNotionProgress(last_notion_progress_, last_notion_category_);
+    }
+}
+
+void LcdDisplay::UpdatePomodoroDisplay() {
+    if (!pomodoro_mode_.load()) return;
+
+    int seconds = pomodoro_seconds_remaining_.load();
+    int total = 25 * 60;
+    int elapsed = total - seconds;
+    int pct = (elapsed * 100) / total;
+    if (pct > 100) pct = 100;
+
+    // Color gradient: red(0%) -> yellow(50%) -> green(100%)
+    uint8_t r, g;
+    if (pct < 50) {
+        r = 255;
+        g = (uint8_t)(pct * 5.1f);
+    } else {
+        r = (uint8_t)((100 - pct) * 5.1f);
+        g = 255;
+    }
+    lv_color_t color = lv_color_make(r, g, 0);
+
+    DisplayLockGuard lock(this);
+    if (pomodoro_time_label_ == nullptr) return;
+
+    if (seconds == 0) {
+        lv_arc_set_value(progress_arc_, 100);
+        lv_obj_set_style_arc_color(progress_arc_, lv_color_hex(0x00FF66), LV_PART_INDICATOR);
+        lv_label_set_text(pomodoro_time_label_, "DONE!");
+        lv_obj_set_style_text_color(pomodoro_time_label_, lv_color_hex(0x00FF66), 0);
+        lv_label_set_text(progress_name_label_, "Great job!");
+        lv_obj_set_style_text_color(progress_name_label_, lv_color_hex(0x00FF66), 0);
+        if (pomodoro_timer_ != nullptr) {
+            esp_timer_stop(pomodoro_timer_);
+        }
+    } else {
+        int mins = (seconds > 0) ? (seconds / 60) : 0;
+        int secs = (seconds > 0) ? (seconds % 60) : 0;
+        char time_text[16];
+        snprintf(time_text, sizeof(time_text), "%02d:%02d", mins, secs);
+        lv_arc_set_value(progress_arc_, pct);
+        lv_obj_set_style_arc_color(progress_arc_, color, LV_PART_INDICATOR);
+        lv_label_set_text(pomodoro_time_label_, time_text);
+        lv_obj_set_style_text_color(pomodoro_time_label_, color, 0);
+        lv_obj_align(pomodoro_time_label_, LV_ALIGN_CENTER, 0, -15);
+    }
+}
+
+void LcdDisplay::PomodoroTimerCallback(void* arg) {
+    LcdDisplay* self = static_cast<LcdDisplay*>(arg);
+    if (self->pomodoro_seconds_remaining_.load() > 0) {
+        self->pomodoro_seconds_remaining_.fetch_sub(1);
+    }
+    self->UpdatePomodoroDisplay();
 }
 
 void LcdDisplay::SetEmotion(const char* emotion) {
