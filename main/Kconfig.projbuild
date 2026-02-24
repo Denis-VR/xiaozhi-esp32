@@ -8,7 +8,7 @@ config OTA_URL
 
 choice
     prompt "Flash Assets"
-    default FLASH_CUSTOM_ASSETS
+    default FLASH_DEFAULT_ASSETS
     help
         Select the assets to flash.
 
@@ -564,7 +564,7 @@ endchoice
 
 choice DISPLAY_STYLE
     prompt "Select display style"
-    default USE_EMOTE_MESSAGE_STYLE
+    default USE_DEFAULT_MESSAGE_STYLE
     help
         Select display style for Xiaozhi device
 
